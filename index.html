@@ -79,14 +79,11 @@ h1{
   font-family:'IBM Plex Mono',monospace;
   font-size:11px;
   color:var(--muted);
-  cursor:pointer;
   padding:5px 10px;
   border-radius:999px;
   border:1.5px solid var(--line);
   background:var(--surface);
-  transition:border-color .15s ease;
 }
-.sync-indicator:hover{border-color:var(--teal);}
 .sync-indicator .dot{
   width:7px;
   height:7px;
@@ -96,6 +93,9 @@ h1{
 .sync-indicator.syncing .dot{
   background:var(--amber);
   animation:pulse-dot 1s infinite;
+}
+.sync-indicator.error .dot{
+  background:var(--rust);
 }
 @keyframes pulse-dot{
   0%,100%{opacity:1;}
@@ -783,7 +783,6 @@ footer.note{
 }
 .stats-year-picker input:focus{outline:none;border-color:var(--teal);}
 
-
 </style>
 </head>
 <body>
@@ -1017,7 +1016,7 @@ footer.note{
     </div>
   </section>
 
-  <footer class="note">AGENDAMENTO ABERTO AO PÚBLICO · PAINEL E LISTAS RESTRITOS AO SUPERVISOR</footer>
+  <footer class="note">AGENDAMENTO ABERTO AO PÚBLICO · PAINEL E LISTAS RESTRITOS AO SUPERVISOR · DADOS SINCRONIZADOS VIA FIREBASE</footer>
 </div>
 
 <div class="modal-overlay" id="passModal">
@@ -1040,51 +1039,39 @@ footer.note{
   <div class="modal-box" id="bookingModalContent"></div>
 </div>
 
-<script>
-const CONFIG_KEY = 'lab-config';
-const BOOKINGS_KEY = 'lab-bookings';
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, deleteDoc,
+  collection, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+// ================================================================
+// CONFIGURAÇÃO DO FIREBASE
+// Cole aqui os dados do SEU projeto Firebase.
+// (Console do Firebase > Configurações do projeto > Seus apps > SDK)
+// Esta chave é pública por natureza (faz parte de qualquer app web
+// com Firebase) — a proteção real dos dados vem das Regras de
+// Segurança do Firestore configuradas no console, não do sigilo
+// desta chave.
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAaYnikQCwv0pC-KcpIMgPqz55tXWcaJ2c",
+  authDomain: "projeto-agenda-69834.firebaseapp.com",
+  projectId: "projeto-agenda-69834",
+  storageBucket: "projeto-agenda-69834.firebasestorage.app",
+  messagingSenderId: "1042956789119",
+  appId: "1:1042956789119:web:09c4759a0058833a19a64a",
+  measurementId: "G-WG2PHD7G1Q"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const configDocRef = doc(db, 'labScheduler', 'config');
+const bookingsColRef = collection(db, 'labScheduler_bookings');
+
 const LABS_VERSION = 2; // aumentar sempre que a lista padrão de laboratórios mudar
 const MATERIALS_VERSION = 2; // aumentar sempre que a lista padrão de materiais mudar
-
-// ============================================================
-// SINCRONIZAÇÃO EM NUVEM (opcional) — via JSONBin.io
-// Preencha as duas linhas abaixo com os dados do seu "bin" no
-// JSONBin.io para que TODOS que abrirem este arquivo compartilhem
-// os mesmos dados, não importa em qual computador/navegador estejam.
-// Deixe CLOUD_SYNC_URL como '' para usar apenas armazenamento local
-// (por navegador, sem compartilhar entre pessoas).
-// ============================================================
-const CLOUD_SYNC_URL = ''; // Ex: 'https://api.jsonbin.io/v3/b/68abc1234567890'
-const CLOUD_SYNC_KEY = ''; // Sua X-Master-Key do JSONBin.io
-
-function cloudHeaders(extra){
-  const h = Object.assign({}, extra || {});
-  if(CLOUD_SYNC_KEY) h['X-Master-Key'] = CLOUD_SYNC_KEY;
-  return h;
-}
-
-async function cloudFetchRecord(){
-  const res = await fetch(`${CLOUD_SYNC_URL}/latest`, {
-    method: 'GET',
-    headers: cloudHeaders()
-  });
-  if(!res.ok) throw new Error('Falha ao buscar dados da nuvem');
-  const data = await res.json();
-  return data.record || {};
-}
-
-async function cloudPushRecord(record){
-  const res = await fetch(CLOUD_SYNC_URL, {
-    method: 'PUT',
-    headers: cloudHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(record)
-  });
-  if(!res.ok) throw new Error('Falha ao salvar dados na nuvem');
-}
-
-async function cloudSaveAll(){
-  await cloudPushRecord({ config, bookings });
-}
 
 const DEFAULT_LABS = [
   {name:'Lab Morfofuncional', capacity:30},
@@ -1124,7 +1111,7 @@ const DEFAULT_CONFIG = {
   materials: DEFAULT_MATERIALS
 };
 
-let config = null;
+let config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let bookings = [];
 let selectedMaterials = new Set();
 let isAdmin = false;
@@ -1134,6 +1121,20 @@ let selectedCalDate = null;
 let statsPeriod = 'month';
 let statsYear = new Date().getFullYear();
 
+// ---------------------------------------------------------------
+// Sanitização — evita que texto digitado por usuários (professor,
+// observações, nomes de sala/material) seja interpretado como HTML.
+// ---------------------------------------------------------------
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1141,86 +1142,88 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-async function loadConfig(){
-  try{
-    if(CLOUD_SYNC_URL){
-      const record = await cloudFetchRecord();
-      config = record.config;
-      if(!config) throw new Error('sem configuração salva na nuvem');
-    } else if(window.storage){
-      const res = await window.storage.get(CONFIG_KEY, true);
-      config = JSON.parse(res.value);
-    } else {
-      const raw = localStorage.getItem(CONFIG_KEY);
-      if(!raw) throw new Error('sem configuração salva');
-      config = JSON.parse(raw);
-    }
-    let needsSave = false;
-    if(!config.adminPassword){
-      config.adminPassword = DEFAULT_CONFIG.adminPassword;
-      needsSave = true;
-    }
-    if(config.labsVersion !== LABS_VERSION){
-      config.labs = JSON.parse(JSON.stringify(DEFAULT_LABS));
-      config.labsVersion = LABS_VERSION;
-      needsSave = true;
-      toast('Lista de laboratórios atualizada.');
-    }
-    if(config.materialsVersion !== MATERIALS_VERSION){
-      const existing = config.materials || [];
-      const merged = existing.slice();
-      DEFAULT_MATERIALS.forEach(m=>{ if(!merged.includes(m)) merged.push(m); });
-      config.materials = merged;
-      config.materialsVersion = MATERIALS_VERSION;
-      needsSave = true;
-      toast('Lista de materiais atualizada.');
-    }
-    if(needsSave) await saveConfig();
-  }catch(e){
+function setSyncStatus(state){
+  // state: 'ok' | 'syncing' | 'error'
+  const el = document.getElementById('syncIndicator');
+  el.style.display = 'flex';
+  el.className = 'sync-indicator' + (state==='syncing' ? ' syncing' : state==='error' ? ' error' : '');
+  const label = state==='error' ? 'Erro de conexão com o Firebase' : 'Sincronizado em tempo real';
+  el.innerHTML = `<span class="dot"></span><span>${label}</span>`;
+}
+
+// ---------------------------------------------------------------
+// Configuração (labs, salas, materiais, senha) — documento único
+// ---------------------------------------------------------------
+async function loadConfigOnce(){
+  const snap = await getDoc(configDocRef);
+  if(snap.exists()){
+    config = snap.data();
+  }else{
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-    await saveConfig();
+    await setDoc(configDocRef, config);
   }
+  let needsSave = false;
+  if(!config.adminPassword){
+    config.adminPassword = DEFAULT_CONFIG.adminPassword;
+    needsSave = true;
+  }
+  if(config.labsVersion !== LABS_VERSION){
+    config.labs = JSON.parse(JSON.stringify(DEFAULT_LABS));
+    config.labsVersion = LABS_VERSION;
+    needsSave = true;
+    toast('Lista de laboratórios atualizada.');
+  }
+  if(config.materialsVersion !== MATERIALS_VERSION){
+    const existing = config.materials || [];
+    const merged = existing.slice();
+    DEFAULT_MATERIALS.forEach(m=>{ if(!merged.includes(m)) merged.push(m); });
+    config.materials = merged;
+    config.materialsVersion = MATERIALS_VERSION;
+    needsSave = true;
+    toast('Lista de materiais atualizada.');
+  }
+  if(needsSave) await saveConfig();
 }
 
 async function saveConfig(){
   try{
-    if(CLOUD_SYNC_URL){
-      await cloudSaveAll();
-    } else if(window.storage){
-      await window.storage.set(CONFIG_KEY, JSON.stringify(config), true);
-    } else {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-    }
-  }catch(e){ toast('Erro ao salvar listas.'); }
-}
-
-async function loadBookings(){
-  try{
-    if(CLOUD_SYNC_URL){
-      const record = await cloudFetchRecord();
-      bookings = record.bookings || [];
-    } else if(window.storage){
-      const res = await window.storage.get(BOOKINGS_KEY, true);
-      bookings = JSON.parse(res.value);
-    } else {
-      const raw = localStorage.getItem(BOOKINGS_KEY);
-      bookings = raw ? JSON.parse(raw) : [];
-    }
+    await setDoc(configDocRef, config);
   }catch(e){
-    bookings = [];
+    console.error(e);
+    toast('Erro ao salvar no Firebase. Verifique sua conexão.');
   }
 }
 
-async function saveBookings(){
-  try{
-    if(CLOUD_SYNC_URL){
-      await cloudSaveAll();
-    } else if(window.storage){
-      await window.storage.set(BOOKINGS_KEY, JSON.stringify(bookings), true);
-    } else {
-      localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
-    }
-  }catch(e){ toast('Erro ao salvar agendamento.'); }
+function listenConfig(){
+  onSnapshot(configDocRef, (snap)=>{
+    if(!snap.exists()) return;
+    config = snap.data();
+    populateRoomSelect();
+    renderMaterialChips();
+    populateFilterRoomOptions();
+    renderManageLists();
+    checkConflict();
+  }, (err)=>{
+    console.error(err);
+    setSyncStatus('error');
+  });
+}
+
+// ---------------------------------------------------------------
+// Agendamentos — uma coleção, um documento por agendamento.
+// Isso evita condições de corrida: cada reserva/cancelamento é
+// uma operação independente no Firestore, não uma reescrita de
+// uma lista inteira.
+// ---------------------------------------------------------------
+function listenBookings(){
+  onSnapshot(bookingsColRef, (snapshot)=>{
+    bookings = snapshot.docs.map(d=>d.data());
+    setSyncStatus('ok');
+    rerenderActivePanel();
+  }, (err)=>{
+    console.error(err);
+    setSyncStatus('error');
+  });
 }
 
 function populateFaseTurmaSelects(){
@@ -1251,7 +1254,7 @@ function populateRoomSelect(){
   const type = currentType();
   const sel = document.getElementById('f-room');
   const rooms = roomsForType(type);
-  sel.innerHTML = rooms.map(r => `<option value="${r.name}">${r.name} (cap. ${r.capacity})</option>`).join('');
+  sel.innerHTML = rooms.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} (cap. ${r.capacity})</option>`).join('');
   document.getElementById('lbl-lab').classList.toggle('checked', type==='lab');
   document.getElementById('lbl-room').classList.toggle('checked', type==='classroom');
   checkConflict();
@@ -1267,14 +1270,14 @@ function renderMaterialChips(){
   }else{
     select.disabled = false;
     select.innerHTML = `<option value="">Selecione um material...</option>` +
-      available.map(m => `<option value="${m}">${m}</option>`).join('');
+      available.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
   }
 
   const list = document.getElementById('selectedMaterialsList');
   list.innerHTML = Array.from(selectedMaterials).map(m => `
-    <span class="selected-material-tag" data-mat="${m}">
-      ${m}
-      <button type="button" data-remove="${m}" aria-label="Remover ${m}">✕</button>
+    <span class="selected-material-tag" data-mat="${escapeHtml(m)}">
+      ${escapeHtml(m)}
+      <button type="button" data-remove="${escapeHtml(m)}" aria-label="Remover ${escapeHtml(m)}">✕</button>
     </span>
   `).join('');
   list.querySelectorAll('button[data-remove]').forEach(btn=>{
@@ -1362,8 +1365,9 @@ async function submitBooking(){
   checkConflict();
   if(document.getElementById('btnSubmit').disabled) return;
 
-  // re-check against latest data to avoid race conditions
-  await loadBookings();
+  // Reconfere contra o estado mais recente (mantido em tempo real
+  // pelo listener do Firestore) para reduzir o risco de duas pessoas
+  // reservarem o mesmo horário quase ao mesmo tempo.
   const clash = bookings.find(b => b.room === room && b.date === date && overlaps(startTime, endTime, b.startTime, b.endTime));
   if(clash){
     checkConflict();
@@ -1380,9 +1384,15 @@ async function submitBooking(){
     createdAt: new Date().toISOString()
   };
 
-  bookings.push(booking);
-  await saveBookings();
-  toast('Agendamento confirmado e adicionado ao calendário.');
+  try{
+    await setDoc(doc(bookingsColRef, String(booking.id)), booking);
+  }catch(e){
+    console.error(e);
+    toast('Erro ao salvar agendamento. Verifique sua conexão.');
+    return;
+  }
+
+  toast(`Agendamento confirmado: ${ticketCode(booking.id)}`);
 
   document.getElementById('f-prof').value='';
   document.getElementById('f-date').value='';
@@ -1396,8 +1406,6 @@ async function submitBooking(){
   selectedMaterials.clear();
   renderMaterialChips();
   checkConflict();
-  renderTickets();
-  populateFilterRoomOptions();
 }
 
 function ticketCode(id){
@@ -1433,12 +1441,12 @@ function renderTickets(){
     <div class="ticket ${b.type}">
       <div class="ticket-main">
         <div class="ticket-code">${ticketCode(b.id)}</div>
-        <div class="ticket-room">${b.room}</div>
-        <div class="ticket-prof">${b.professor}</div>
-        ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${[b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · ')}</div>` : ''}
+        <div class="ticket-room">${escapeHtml(b.room)}</div>
+        <div class="ticket-prof">${escapeHtml(b.professor)}</div>
+        ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${escapeHtml([b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="ticket-datetime">${fmtDate(b.date)} · ${b.startTime}–${b.endTime}</div>
-        ${b.materials && b.materials.length ? `<div class="ticket-materials">${b.materials.map(m=>`<span>${m}</span>`).join('')}</div>` : ''}
-        ${b.notes ? `<div class="ticket-notes"><strong>Obs.:</strong> ${b.notes}</div>` : ''}
+        ${b.materials && b.materials.length ? `<div class="ticket-materials">${b.materials.map(m=>`<span>${escapeHtml(m)}</span>`).join('')}</div>` : ''}
+        ${b.notes ? `<div class="ticket-notes"><strong>Obs.:</strong> ${escapeHtml(b.notes)}</div>` : ''}
       </div>
       <div class="ticket-side">
         <span class="badge ${b.type}">${b.type==='lab'?'Laboratório':'Sala de aula'}</span>
@@ -1450,12 +1458,15 @@ function renderTickets(){
 
   list.querySelectorAll('[data-cancel]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = Number(btn.dataset.cancel);
+      const id = btn.dataset.cancel;
       if(!confirm('Cancelar este agendamento?')) return;
-      bookings = bookings.filter(b=>b.id !== id);
-      await saveBookings();
-      renderTickets();
-      toast('Agendamento cancelado.');
+      try{
+        await deleteDoc(doc(bookingsColRef, String(id)));
+        toast('Agendamento cancelado.');
+      }catch(e){
+        console.error(e);
+        toast('Erro ao cancelar. Verifique sua conexão.');
+      }
     });
   });
 }
@@ -1500,7 +1511,7 @@ function renderCalendar(){
     const isSel = c.dateStr === selectedCalDate;
     const maxShow = 3;
     const eventsHtml = dayBookings.slice(0,maxShow).map(b=>
-      `<div class="cal-event ${b.type}" data-id="${b.id}" title="${b.professor} · ${b.room} · ${b.startTime}–${b.endTime}">${b.professor} · ${b.room}</div>`
+      `<div class="cal-event ${b.type}" data-id="${b.id}" title="${escapeHtml(b.professor)} · ${escapeHtml(b.room)} · ${b.startTime}–${b.endTime}">${escapeHtml(b.professor)} · ${escapeHtml(b.room)}</div>`
     ).join('');
     const moreHtml = dayBookings.length > maxShow ? `<div class="cal-event-more">+${dayBookings.length-maxShow} mais</div>` : '';
     return `<div class="cal-day ${isToday?'today':''} ${isSel?'selected':''}" data-date="${c.dateStr}">
@@ -1547,12 +1558,12 @@ function renderCalDayDetail(){
     <div class="ticket ${b.type}" data-id="${b.id}" style="cursor:pointer;">
       <div class="ticket-main">
         <div class="ticket-code">${ticketCode(b.id)}</div>
-        <div class="ticket-room">${b.room}</div>
-        <div class="ticket-prof">${b.professor}</div>
-        ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${[b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · ')}</div>` : ''}
+        <div class="ticket-room">${escapeHtml(b.room)}</div>
+        <div class="ticket-prof">${escapeHtml(b.professor)}</div>
+        ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${escapeHtml([b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="ticket-datetime">${b.startTime}–${b.endTime}</div>
-        ${b.materials && b.materials.length ? `<div class="ticket-materials">${b.materials.map(m=>`<span>${m}</span>`).join('')}</div>` : ''}
-        ${b.notes ? `<div class="ticket-notes"><strong>Obs.:</strong> ${b.notes}</div>` : ''}
+        ${b.materials && b.materials.length ? `<div class="ticket-materials">${b.materials.map(m=>`<span>${escapeHtml(m)}</span>`).join('')}</div>` : ''}
+        ${b.notes ? `<div class="ticket-notes"><strong>Obs.:</strong> ${escapeHtml(b.notes)}</div>` : ''}
       </div>
       <div class="ticket-side">
         <span class="badge ${b.type}">${b.type==='lab'?'Laboratório':'Sala de aula'}</span>
@@ -1598,7 +1609,7 @@ function renderBarChart(containerId, counts, fillClassFn){
     const pct = Math.max(6, Math.round((count/max)*100));
     const cls = fillClassFn ? fillClassFn(name) : '';
     return `<div class="bar-row">
-      <div class="bar-label" title="${name}">${name}</div>
+      <div class="bar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
       <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
       <div class="bar-count">${count}</div>
     </div>`;
@@ -1635,15 +1646,15 @@ function openBookingDetail(id){
   const content = document.getElementById('bookingModalContent');
   content.innerHTML = `
     <span class="eyebrow">${b.type==='lab'?'Laboratório':'Sala de aula'} · ${ticketCode(b.id)}</span>
-    <h2>${b.room}</h2>
-    <p><strong>Professor(a):</strong> ${b.professor}</p>
-    ${b.uc ? `<p><strong>Unidade Curricular:</strong> ${b.uc}</p>` : ''}
-    ${(b.fase || b.turma) ? `<p><strong>Fase/Turma:</strong> ${[b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · ')}</p>` : ''}
+    <h2>${escapeHtml(b.room)}</h2>
+    <p><strong>Professor(a):</strong> ${escapeHtml(b.professor)}</p>
+    ${b.uc ? `<p><strong>Unidade Curricular:</strong> ${escapeHtml(b.uc)}</p>` : ''}
+    ${(b.fase || b.turma) ? `<p><strong>Fase/Turma:</strong> ${escapeHtml([b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</p>` : ''}
     <p><strong>Data:</strong> ${fmtDate(b.date)}</p>
     <p><strong>Horário:</strong> ${b.startTime}–${b.endTime}</p>
     <p><strong>Alunos:</strong> ${b.students ? b.students : 'não informado'}</p>
-    <p style="margin-bottom:12px;"><strong>Materiais:</strong> ${b.materials && b.materials.length ? b.materials.join(', ') : 'nenhum'}</p>
-    ${b.notes ? `<p style="margin-bottom:18px;"><strong>Observações:</strong> ${b.notes}</p>` : ''}
+    <p style="margin-bottom:12px;"><strong>Materiais:</strong> ${b.materials && b.materials.length ? escapeHtml(b.materials.join(', ')) : 'nenhum'}</p>
+    ${b.notes ? `<p style="margin-bottom:18px;"><strong>Observações:</strong> ${escapeHtml(b.notes)}</p>` : ''}
     <div class="modal-actions">
       <button class="btn-ghost" id="bookingModalClose" style="flex:1;">Fechar</button>
     </div>
@@ -1660,24 +1671,24 @@ function populateFilterRoomOptions(){
   const sel = document.getElementById('filt-room');
   const all = [...config.labs, ...config.classrooms].map(r=>r.name);
   const current = sel.value;
-  sel.innerHTML = `<option value="">Todos os ambientes</option>` + all.map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.innerHTML = `<option value="">Todos os ambientes</option>` + all.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   sel.value = current;
 }
 
 function renderManageLists(){
   document.getElementById('listLabs').innerHTML = config.labs.map((r,i)=>`
     <div class="manage-item">
-      <span>${r.name} <span class="cap">cap. ${r.capacity}</span></span>
+      <span>${escapeHtml(r.name)} <span class="cap">cap. ${r.capacity}</span></span>
       <button class="remove-x" data-remove="labs" data-idx="${i}">×</button>
     </div>`).join('');
   document.getElementById('listRooms').innerHTML = config.classrooms.map((r,i)=>`
     <div class="manage-item">
-      <span>${r.name} <span class="cap">cap. ${r.capacity}</span></span>
+      <span>${escapeHtml(r.name)} <span class="cap">cap. ${r.capacity}</span></span>
       <button class="remove-x" data-remove="classrooms" data-idx="${i}">×</button>
     </div>`).join('');
   document.getElementById('listMaterials').innerHTML = config.materials.map((m,i)=>`
     <div class="manage-item">
-      <span>${m}</span>
+      <span>${escapeHtml(m)}</span>
       <button class="remove-x" data-remove="materials" data-idx="${i}">×</button>
     </div>`).join('');
 
@@ -1730,7 +1741,6 @@ function switchPanel(name){
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id === 'panel-'+name));
   if(name === 'painel') renderTickets();
   if(name === 'calendario') renderCalendar();
-  if((name === 'painel' || name === 'calendario') && CLOUD_SYNC_URL) refreshFromCloud(false);
 }
 
 function openPasswordModal(targetPanel){
@@ -1788,64 +1798,6 @@ function rerenderActivePanel(){
   checkConflict();
 }
 
-async function refreshFromCloud(showToast){
-  if(!CLOUD_SYNC_URL) return;
-  const indicator = document.getElementById('syncIndicator');
-  indicator.classList.add('syncing');
-  try{
-    const record = await cloudFetchRecord();
-    if(record.config) config = record.config;
-    bookings = record.bookings || [];
-    populateRoomSelect();
-    renderMaterialChips();
-    populateFilterRoomOptions();
-    renderManageLists();
-    rerenderActivePanel();
-    if(showToast) toast('Dados atualizados.');
-  }catch(e){
-    if(showToast) toast('Não foi possível sincronizar agora.');
-  }finally{
-    indicator.classList.remove('syncing');
-  }
-}
-
-let cloudPollTimer = null;
-const CLOUD_POLL_INTERVAL_MS = 60000; // sincroniza a cada 60s, só quando necessário (economiza cota gratuita)
-
-function startCloudPolling(){
-  if(cloudPollTimer || !CLOUD_SYNC_URL) return;
-  cloudPollTimer = setInterval(()=>{
-    const panel = getActivePanelName();
-    if(panel === 'painel' || panel === 'calendario') refreshFromCloud(false);
-  }, CLOUD_POLL_INTERVAL_MS);
-}
-
-function stopCloudPolling(){
-  if(cloudPollTimer){ clearInterval(cloudPollTimer); cloudPollTimer = null; }
-}
-
-function setupCloudSync(){
-  const indicator = document.getElementById('syncIndicator');
-  if(!CLOUD_SYNC_URL){
-    indicator.style.display = 'none';
-    return;
-  }
-  indicator.style.display = 'flex';
-  indicator.innerHTML = `<span class="dot"></span><span>Sincronizado — toque para atualizar</span>`;
-  indicator.addEventListener('click', ()=>refreshFromCloud(true));
-
-  if(!document.hidden) startCloudPolling();
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.hidden){
-      stopCloudPolling();
-    }else{
-      refreshFromCloud(false);
-      startCloudPolling();
-    }
-  });
-}
-
-
 function updateLockUI(){
   document.getElementById('tab-painel').querySelector('.lock-icon').style.display = isAdmin ? 'none' : 'inline';
   document.getElementById('tab-listas').querySelector('.lock-icon').style.display = isAdmin ? 'none' : 'inline';
@@ -1857,17 +1809,16 @@ function updateStatsVisibility(){
 }
 
 async function init(){
+  setSyncStatus('syncing');
   try{
-    await loadConfig();
-    await loadBookings();
+    await loadConfigOnce();
   }catch(e){
-    config = config || JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-    bookings = bookings || [];
-    toast('Não foi possível carregar dados salvos. Iniciando com valores padrão.');
+    console.error(e);
+    toast('Não foi possível conectar ao Firebase. Verifique a configuração (firebaseConfig) e sua conexão.');
+    setSyncStatus('error');
   }
 
   document.getElementById('headerMeta').textContent = new Date().toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-  setupCloudSync();
 
   document.querySelectorAll('nav.tabs button').forEach(b=>{
     b.addEventListener('click', ()=>switchPanel(b.dataset.panel));
@@ -1974,9 +1925,14 @@ async function init(){
   renderMaterialChips();
   populateFilterRoomOptions();
   renderManageLists();
-  renderTickets();
   initCalendarState();
   updateStatsVisibility();
+
+  // A partir daqui, os dados ficam sincronizados em tempo real:
+  // qualquer alteração feita por qualquer pessoa em qualquer
+  // dispositivo aparece automaticamente para todos os outros.
+  listenConfig();
+  listenBookings();
 }
 
 init();
