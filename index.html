@@ -1039,6 +1039,9 @@ footer.note{
   <div class="modal-box" id="bookingModalContent"></div>
 </div>
 
+<!-- SDK do EmailJS — envia o e-mail de aviso direto do navegador, sem backend -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
@@ -1069,6 +1072,48 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const configDocRef = doc(db, 'labScheduler', 'config');
 const bookingsColRef = collection(db, 'labScheduler_bookings');
+
+// ================================================================
+// CONFIGURAÇÃO DO EMAILJS
+// Serve para avisar o técnico/supervisor por e-mail sempre que um
+// professor confirmar um novo agendamento. Preencha os 3 valores
+// abaixo com os dados da sua conta em https://www.emailjs.com
+// Deixe EMAILJS_PUBLIC_KEY como '' para desativar o envio de e-mail
+// (o agendamento continua funcionando normalmente sem isso).
+// ================================================================
+const EMAILJS_PUBLIC_KEY  = 'iuzG1yNuGtEGYARCA'; // Account > API Keys > Public Key
+const EMAILJS_SERVICE_ID  = 'service_dd5p12q'; // Email Services > seu serviço (ID)
+const EMAILJS_TEMPLATE_ID = 'template_p2waydj'; // Email Templates > seu template (ID)
+
+function emailNotificationsEnabled(){
+  return !!(EMAILJS_PUBLIC_KEY && EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && window.emailjs);
+}
+
+async function sendBookingEmail(b){
+  if(!emailNotificationsEnabled()) return;
+  const materiaisTexto = (b.materials && b.materials.length) ? b.materials.join(', ') : 'nenhum';
+  const params = {
+    ticket_code: 'REQ-' + String(b.id).slice(-5),
+    professor: b.professor,
+    tipo_ambiente: b.type === 'lab' ? 'Laboratório' : 'Sala de aula',
+    ambiente: b.room,
+    data: fmtDate(b.date),
+    horario: `${b.startTime}–${b.endTime}`,
+    uc: b.uc || '—',
+    fase: b.fase ? `${b.fase}ª fase` : '—',
+    turma: b.turma ? `Turma ${b.turma}` : '—',
+    alunos: b.students || 'não informado',
+    materiais: materiaisTexto,
+    observacoes: b.notes || '—'
+  };
+  try{
+    await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params, { publicKey: EMAILJS_PUBLIC_KEY });
+  }catch(e){
+    console.error('Falha ao enviar e-mail de aviso:', e);
+    // Não interrompe o fluxo: o agendamento já foi salvo no Firestore
+    // mesmo que o e-mail de aviso falhe.
+  }
+}
 
 const LABS_VERSION = 2; // aumentar sempre que a lista padrão de laboratórios mudar
 const MATERIALS_VERSION = 2; // aumentar sempre que a lista padrão de materiais mudar
@@ -1391,6 +1436,10 @@ async function submitBooking(){
     toast('Erro ao salvar agendamento. Verifique sua conexão.');
     return;
   }
+
+  // O aviso por e-mail é "melhor esforço": se falhar, o agendamento
+  // continua confirmado normalmente (já está salvo no Firestore).
+  sendBookingEmail(booking);
 
   toast(`Agendamento confirmado: ${ticketCode(booking.id)}`);
 
