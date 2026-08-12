@@ -316,6 +316,17 @@ nav.tabs button:not(.active):hover{
 }
 .selected-material-tag button:hover{background:rgba(0,0,0,0.16);}
 
+.room-dot{
+  display:inline-block;
+  width:9px;height:9px;
+  border-radius:50%;
+  margin-right:7px;
+  flex-shrink:0;
+  vertical-align:middle;
+}
+
+.btn-ghost.full-width{width:100%;text-align:center;margin-top:10px;}
+
 .conflict-box{
   border-radius:8px;
   padding:14px 16px;
@@ -408,8 +419,8 @@ nav.tabs button:not(.active):hover{
   width:4px;
   border-radius:10px 0 0 10px;
 }
-.ticket.lab::after{background:var(--teal);}
-.ticket.classroom::after{background:var(--indigo);}
+.ticket.lab::after{background:var(--room-accent, var(--teal));}
+.ticket.classroom::after{background:var(--room-accent, var(--indigo));}
 
 .ticket-main{flex:1;min-width:220px;}
 .ticket-code{
@@ -699,19 +710,35 @@ footer.note{
   text-overflow:ellipsis;
   cursor:pointer;
 }
-.cal-event:hover{filter:brightness(0.94);}
-.cal-event.lab{background:var(--teal-soft);color:var(--teal-dark);}
-.cal-event.classroom{background:var(--indigo-soft);color:var(--indigo);}
+.cal-event:hover{filter:brightness(0.9);}
+.cal-event{background:var(--room-solid, var(--teal));color:#fff;}
 .cal-event-more{
   font-size:10px;
   color:var(--muted);
   font-weight:600;
   padding-left:2px;
 }
+.cal-events-mobile{
+  display:none;
+  flex-wrap:wrap;
+  gap:3px;
+  align-items:center;
+}
+.cal-dot{
+  width:7px;height:7px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.cal-dot-more{
+  font-size:9px;
+  font-weight:700;
+  color:var(--muted);
+  font-family:'IBM Plex Mono',monospace;
+}
 @media(max-width:560px){
-  .cal-day{min-height:56px;padding:5px;}
-  .cal-event{display:none;}
-  .cal-event:first-child{display:block;}
+  .cal-day{min-height:50px;padding:5px;gap:4px;}
+  .cal-events-desktop{display:none;}
+  .cal-events-mobile{display:flex;}
 }
 #calDayDetail h3{
   font-family:'Space Grotesk',sans-serif;
@@ -782,6 +809,81 @@ footer.note{
   color:var(--ink);
 }
 .stats-year-picker input:focus{outline:none;border-color:var(--teal);}
+
+.stats-kpis{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:14px;
+  margin:18px 0 28px;
+}
+.stats-header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.stats-header-row .stats-sub{margin:0;}
+.stats-header-row .btn-ghost{flex:none;white-space:nowrap;}
+.kpi-box{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px 14px;
+  text-align:center;
+}
+.kpi-value{
+  font-size:26px;
+  font-weight:800;
+  color:var(--teal-dark);
+  font-family:'IBM Plex Mono',monospace;
+  line-height:1.1;
+}
+.kpi-label{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:5px;
+}
+
+/* ================= AJUSTES GERAIS PARA CELULAR ================= */
+@media(max-width:600px){
+  body{padding:16px 10px 70px;}
+  .card{padding:16px 14px;border-radius:9px;}
+
+  header.app-header{align-items:flex-start;margin-bottom:20px;padding-bottom:14px;}
+  .header-meta{text-align:left;}
+
+  nav.tabs{flex-wrap:wrap;margin-bottom:18px;}
+  nav.tabs button{flex:1 1 46%;padding:10px 6px;font-size:11.5px;}
+
+  .cal-header{gap:8px;}
+  .cal-header-center{gap:6px;width:100%;justify-content:center;order:3;}
+  .cal-title{min-width:0;font-size:15px;}
+  #cal-prev, #cal-next{flex:1;text-align:center;padding:8px 6px;font-size:12px;}
+  #cal-today{padding:8px 10px;font-size:12px;}
+
+  .cal-weekday{font-size:9.5px;}
+  .cal-grid{gap:4px;}
+  .cal-weekdays{gap:4px;}
+
+  .ticket{padding:16px 14px 16px 20px;}
+  .ticket-side{align-items:flex-start;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;width:100%;}
+
+  .filters{gap:8px;}
+  .filters input, .filters select{min-width:0;flex:1 1 100%;}
+
+  .modal-box{padding:20px;max-width:92vw;}
+
+  .stats-kpis{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .kpi-box{padding:12px 10px;}
+  .kpi-value{font-size:21px;}
+
+  .stats-header-row{align-items:stretch;}
+  .stats-header-row .btn-ghost{width:100%;text-align:center;}
+
+  .selected-materials{gap:6px;}
+  .selected-material-tag{font-size:12px;padding:5px 7px 5px 11px;}
+}
 
 </style>
 </head>
@@ -861,8 +963,16 @@ footer.note{
       </div>
 
       <div class="field">
-        <label for="f-room">Ambiente específico</label>
-        <select id="f-room"></select>
+        <label for="f-room-select" id="lbl-room-field">Ambiente(s) específico(s)</label>
+        <select id="f-room-select"></select>
+        <div class="row2" id="classroomInputs" style="display:none;gap:8px;margin-bottom:0;">
+          <input type="text" id="f-classroom-number" placeholder="Número da sala (ex: 204)">
+          <select id="f-classroom-block">
+            <option value="">Bloco</option>
+          </select>
+        </div>
+        <button type="button" class="btn-ghost full-width" id="btnAddClassroom" style="display:none;">+ Adicionar sala</button>
+        <div class="selected-materials" id="selectedRoomsList"></div>
       </div>
 
       <div class="field">
@@ -935,11 +1045,45 @@ footer.note{
           </div>
         </div>
         <h3 class="stats-heading">Estatísticas</h3>
-        <p class="stats-sub" id="statsPeriodLabel"></p>
+        <div class="stats-header-row">
+          <p class="stats-sub" id="statsPeriodLabel"></p>
+          <button class="btn-ghost" id="btnExportStats">⬇ Exportar dados (CSV)</button>
+        </div>
+
+        <div class="stats-kpis" id="statsKpis"></div>
+
         <div class="stats-grid">
           <div class="stats-col">
             <h4>Ambientes mais utilizados</h4>
             <div id="chartRooms"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Tipo de ambiente</h4>
+            <div id="chartType"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Professores mais ativos</h4>
+            <div id="chartProfessors"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Unidades Curriculares</h4>
+            <div id="chartUC"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Fase/Etapa</h4>
+            <div id="chartFase"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Turmas</h4>
+            <div id="chartTurma"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Dia da semana</h4>
+            <div id="chartWeekday"></div>
+          </div>
+          <div class="stats-col">
+            <h4>Horários mais procurados</h4>
+            <div id="chartHour"></div>
           </div>
           <div class="stats-col">
             <h4>Materiais mais utilizados</h4>
@@ -1039,24 +1183,32 @@ footer.note{
   <div class="modal-box" id="bookingModalContent"></div>
 </div>
 
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <h2 id="confirmModalTitle" style="margin-bottom:10px;">Confirmar</h2>
+    <p id="confirmModalMsg" style="margin-bottom:20px;color:var(--ink-soft);"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="confirmModalNo" style="flex:1;">Voltar</button>
+      <button class="btn-primary" id="confirmModalYes" style="flex:1;background:var(--rust);border-color:var(--rust);">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- SDK do EmailJS — envia o e-mail de aviso direto do navegador, sem backend -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc,
+  getFirestore, doc, getDoc, setDoc, deleteDoc, writeBatch,
   collection, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import {
+  initializeAppCheck, ReCaptchaV3Provider
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check.js";
 
 // ================================================================
 // CONFIGURAÇÃO DO FIREBASE
-// Cole aqui os dados do SEU projeto Firebase.
-// (Console do Firebase > Configurações do projeto > Seus apps > SDK)
-// Esta chave é pública por natureza (faz parte de qualquer app web
-// com Firebase) — a proteção real dos dados vem das Regras de
-// Segurança do Firestore configuradas no console, não do sigilo
-// desta chave.
 // ================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyAaYnikQCwv0pC-KcpIMgPqz55tXWcaJ2c",
@@ -1068,18 +1220,29 @@ const firebaseConfig = {
   measurementId: "G-WG2PHD7G1Q"
 };
 
+const RECAPTCHA_V3_SITE_KEY = '6LdBY4ItAAAAABaRseFBCYE_0ukJEYsWN_JPhYPz'; // cole aqui a Site Key do reCAPTCHA v3
+
 const app = initializeApp(firebaseConfig);
+
+// Ativa o App Check apenas se a Site Key do reCAPTCHA v3 já tiver sido configurada. 
+// Enquanto estiver vazia, o app segue funcionando normalmente sem essa camada.
+if(RECAPTCHA_V3_SITE_KEY){
+  try{
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
+      isTokenAutoRefreshEnabled: true
+    });
+  }catch(e){
+    console.warn('Não foi possível inicializar o Firebase App Check:', e);
+  }
+}
+
 const db = getFirestore(app);
 const configDocRef = doc(db, 'labScheduler', 'config');
 const bookingsColRef = collection(db, 'labScheduler_bookings');
 
 // ================================================================
 // CONFIGURAÇÃO DO EMAILJS
-// Serve para avisar o técnico/supervisor por e-mail sempre que um
-// professor confirmar um novo agendamento. Preencha os 3 valores
-// abaixo com os dados da sua conta em https://www.emailjs.com
-// Deixe EMAILJS_PUBLIC_KEY como '' para desativar o envio de e-mail
-// (o agendamento continua funcionando normalmente sem isso).
 // ================================================================
 const EMAILJS_PUBLIC_KEY  = 'iuzG1yNuGtEGYARCA'; // Account > API Keys > Public Key
 const EMAILJS_SERVICE_ID  = 'service_dd5p12q'; // Email Services > seu serviço (ID)
@@ -1089,34 +1252,39 @@ function emailNotificationsEnabled(){
   return !!(EMAILJS_PUBLIC_KEY && EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && window.emailjs);
 }
 
-async function sendBookingEmail(b){
-  if(!emailNotificationsEnabled()) return;
-  const materiaisTexto = (b.materials && b.materials.length) ? b.materials.join(', ') : 'nenhum';
+// Recebe a lista de agendamentos criados numa mesma confirmação
+// e envia um único e-mail de aviso, juntando os ambientes.
+async function sendBookingEmail(newBookings){
+  if(!emailNotificationsEnabled() || !newBookings.length) return;
+  const first = newBookings[0];
+  const rooms = newBookings.map(b=>b.room).join(', ');
+  const materiaisTexto = (first.materials && first.materials.length) ? first.materials.join(', ') : 'nenhum';
   const params = {
-    ticket_code: 'REQ-' + String(b.id).slice(-5),
-    professor: b.professor,
-    tipo_ambiente: b.type === 'lab' ? 'Laboratório' : 'Sala de aula',
-    ambiente: b.room,
-    data: fmtDate(b.date),
-    horario: `${b.startTime}–${b.endTime}`,
-    uc: b.uc || '—',
-    fase: b.fase ? `${b.fase}ª fase` : '—',
-    turma: b.turma ? `Turma ${b.turma}` : '—',
-    alunos: b.students || 'não informado',
+    ticket_code: 'REQ-' + String(first.id).slice(-5),
+    professor: first.professor,
+    tipo_ambiente: first.type === 'lab' ? 'Laboratório' : 'Sala de aula',
+    ambiente: rooms,
+    ambientes: rooms,
+    data: fmtDate(first.date),
+    horario: `${first.startTime}–${first.endTime}`,
+    uc: first.uc || '—',
+    fase: first.fase ? `${first.fase}ª fase` : '—',
+    turma: first.turma ? `Turma ${first.turma}` : '—',
+    alunos: first.students || 'não informado',
     materiais: materiaisTexto,
-    observacoes: b.notes || '—'
+    observacoes: first.notes || '—'
   };
   try{
     await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params, { publicKey: EMAILJS_PUBLIC_KEY });
   }catch(e){
     console.error('Falha ao enviar e-mail de aviso:', e);
-    // Não interrompe o fluxo: o agendamento já foi salvo no Firestore
-    // mesmo que o e-mail de aviso falhe.
+    // Não interrompe o fluxo: o(s) agendamento(s) já foram salvos no
+    // Firestore mesmo que o e-mail de aviso falhe.
   }
 }
 
 const LABS_VERSION = 2; // aumentar sempre que a lista padrão de laboratórios mudar
-const MATERIALS_VERSION = 2; // aumentar sempre que a lista padrão de materiais mudar
+const MATERIALS_VERSION = 3; // aumentar sempre que a lista padrão de materiais mudar
 
 const DEFAULT_LABS = [
   {name:'Lab Morfofuncional', capacity:30},
@@ -1140,7 +1308,8 @@ const DEFAULT_LABS = [
 
 const DEFAULT_MATERIALS = [
   'Projetor', 'Notebook', 'Caixa de som', 'Microscópio', 'Vidraria', 'Kit de reagentes',
-  'Manequim alta complexidade SIMMan3G', 'Manequim média complexidade', 'Manequim treino de habilidades'
+  'Manequim alta complexidade SIMMan3G', 'Manequim média complexidade', 'Manequim treino de habilidades',
+  'Outros (especificar nas observações)'
 ];
 
 const DEFAULT_CONFIG = {
@@ -1159,12 +1328,15 @@ const DEFAULT_CONFIG = {
 let config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let bookings = [];
 let selectedMaterials = new Set();
+let selectedRooms = new Set();
 let isAdmin = false;
 let pendingPanel = null;
 let calYear, calMonth;
 let selectedCalDate = null;
 let statsPeriod = 'month';
 let statsYear = new Date().getFullYear();
+
+const BLOCK_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
 
 // ---------------------------------------------------------------
 // Sanitização — evita que texto digitado por usuários (professor,
@@ -1194,6 +1366,54 @@ function setSyncStatus(state){
   el.className = 'sync-indicator' + (state==='syncing' ? ' syncing' : state==='error' ? ' error' : '');
   const label = state==='error' ? 'Erro de conexão com o Firebase' : 'Sincronizado em tempo real';
   el.innerHTML = `<span class="dot"></span><span>${label}</span>`;
+}
+
+// Substitui o confirm() nativo do navegador por um modal com o
+// mesmo estilo visual do restante do app. Retorna uma Promise<boolean>.
+function showConfirm(message, title){
+  return new Promise(resolve=>{
+    document.getElementById('confirmModalTitle').textContent = title || 'Confirmar';
+    document.getElementById('confirmModalMsg').textContent = message;
+    const modal = document.getElementById('confirmModal');
+    const yesBtn = document.getElementById('confirmModalYes');
+    const noBtn = document.getElementById('confirmModalNo');
+    modal.classList.add('show');
+
+    function cleanup(result){
+      modal.classList.remove('show');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      resolve(result);
+    }
+    function onYes(){ cleanup(true); }
+    function onNo(){ cleanup(false); }
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+}
+
+// Gera uma cor estável para cada ambiente, a partir do nome (mesmo
+// ambiente = mesma cor sempre, em qualquer navegador/dispositivo).
+// Usa a razão áurea para espalhar bem as cores, evitando tons parecidos
+// entre ambientes com nomes semelhantes (ex: "Consultório 1", "2"...).
+function roomHue(roomName){
+  let hash = 0;
+  const str = String(roomName||'');
+  for(let i=0;i<str.length;i++){
+    hash = str.charCodeAt(i) + ((hash<<5)-hash);
+    hash |= 0;
+  }
+  const golden = 0.6180339887;
+  const frac = ((Math.abs(hash) * golden) % 1);
+  return Math.floor(frac * 360);
+}
+function roomColorVars(roomName){
+  const hue = roomHue(roomName);
+  return `--room-accent:hsl(${hue},58%,32%);--room-soft:hsl(${hue},72%,86%);--room-solid:hsl(${hue},62%,48%);`;
+}
+function roomDot(roomName){
+  const hue = roomHue(roomName);
+  return `<span class="room-dot" style="background:hsl(${hue},62%,48%);"></span>`;
 }
 
 // ---------------------------------------------------------------
@@ -1264,6 +1484,7 @@ function listenBookings(){
   onSnapshot(bookingsColRef, (snapshot)=>{
     bookings = snapshot.docs.map(d=>d.data());
     setSyncStatus('ok');
+    populateFilterRoomOptions();
     rerenderActivePanel();
   }, (err)=>{
     console.error(err);
@@ -1297,12 +1518,94 @@ function roomsForType(type){
 
 function populateRoomSelect(){
   const type = currentType();
-  const sel = document.getElementById('f-room');
-  const rooms = roomsForType(type);
-  sel.innerHTML = rooms.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} (cap. ${r.capacity})</option>`).join('');
   document.getElementById('lbl-lab').classList.toggle('checked', type==='lab');
   document.getElementById('lbl-room').classList.toggle('checked', type==='classroom');
+
+  const isClassroom = type === 'classroom';
+  document.getElementById('f-room-select').style.display = isClassroom ? 'none' : '';
+  document.getElementById('classroomInputs').style.display = isClassroom ? 'flex' : 'none';
+  document.getElementById('btnAddClassroom').style.display = isClassroom ? 'block' : 'none';
+  document.getElementById('lbl-room-field').textContent = isClassroom ? 'Sala(s) de aula (número e bloco)' : 'Laboratório(s) específico(s)';
+
+  const blockSelect = document.getElementById('f-classroom-block');
+  if(blockSelect.options.length <= 1){
+    blockSelect.innerHTML = `<option value="">Bloco</option>` + BLOCK_LETTERS.map(l=>`<option value="${l}">Bloco ${l}</option>`).join('');
+  }
+
+  renderRoomChips();
   checkConflict();
+}
+
+function renderRoomChips(){
+  const type = currentType();
+
+  if(type === 'lab'){
+    const rooms = roomsForType(type);
+    const select = document.getElementById('f-room-select');
+    const available = rooms.filter(r => !selectedRooms.has(r.name));
+
+    if(available.length === 0){
+      select.innerHTML = `<option value="">${rooms.length ? 'Todos os ambientes já foram adicionados' : 'Nenhum ambiente cadastrado'}</option>`;
+      select.disabled = true;
+    }else{
+      select.disabled = false;
+      select.innerHTML = `<option value="">Selecione um ambiente...</option>` +
+        available.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} (cap. ${r.capacity})</option>`).join('');
+    }
+  }
+
+  const list = document.getElementById('selectedRoomsList');
+  list.innerHTML = Array.from(selectedRooms).map(name => `
+    <span class="selected-material-tag" data-room="${escapeHtml(name)}">
+      ${roomDot(name)}${escapeHtml(name)}
+      <button type="button" data-remove-room="${escapeHtml(name)}" aria-label="Remover ${escapeHtml(name)}">✕</button>
+    </span>
+  `).join('');
+  list.querySelectorAll('button[data-remove-room]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      selectedRooms.delete(btn.dataset.removeRoom);
+      renderRoomChips();
+      checkConflict();
+    });
+  });
+}
+
+function addSelectedRoom(){
+  const select = document.getElementById('f-room-select');
+  const r = select.value;
+  if(!r) return;
+  selectedRooms.add(r);
+  renderRoomChips();
+  checkConflict();
+}
+
+function addClassroomRoom(){
+  const numInput = document.getElementById('f-classroom-number');
+  const blockSelect = document.getElementById('f-classroom-block');
+  const number = numInput.value.trim();
+  const block = blockSelect.value;
+
+  if(!number){
+    toast('Digite o número da sala.');
+    return;
+  }
+  if(!block){
+    toast('Selecione o bloco da sala.');
+    return;
+  }
+
+  const name = `Sala ${number} - Bloco ${block}`;
+  if(selectedRooms.has(name)){
+    toast('Essa sala já foi adicionada.');
+    return;
+  }
+
+  selectedRooms.add(name);
+  renderRoomChips();
+  checkConflict();
+  numInput.value = '';
+  blockSelect.value = '';
+  numInput.focus();
 }
 
 function renderMaterialChips(){
@@ -1350,14 +1653,13 @@ function checkConflict(){
   const date = document.getElementById('f-date').value;
   const start = document.getElementById('f-start').value;
   const end = document.getElementById('f-end').value;
-  const room = document.getElementById('f-room').value;
   const students = parseInt(document.getElementById('f-students').value, 10);
   const btn = document.getElementById('btnSubmit');
 
   box.className = 'conflict-box';
   btn.disabled = false;
 
-  if(!date || !start || !end || !room){
+  if(!date || !start || !end || selectedRooms.size === 0){
     box.classList.remove('show');
     return;
   }
@@ -1369,24 +1671,32 @@ function checkConflict(){
     return;
   }
 
-  const clash = bookings.find(b => b.room === room && b.date === date && overlaps(start, end, b.startTime, b.endTime));
-  if(clash){
-    box.classList.add('show','err');
-    box.textContent = `Conflito de horário: ${room} já está reservado por ${clash.professor} das ${clash.startTime} às ${clash.endTime} nesse dia.`;
-    btn.disabled = true;
-    return;
+  const rooms = roomsForType(currentType());
+  const roomNames = Array.from(selectedRooms);
+
+  for(const room of roomNames){
+    const clash = bookings.find(b => b.room === room && b.date === date && overlaps(start, end, b.startTime, b.endTime));
+    if(clash){
+      box.classList.add('show','err');
+      box.textContent = `Conflito de horário: ${room} já está reservado por ${clash.professor} das ${clash.startTime} às ${clash.endTime} nesse dia.`;
+      btn.disabled = true;
+      return;
+    }
   }
 
-  const rooms = roomsForType(currentType());
-  const roomInfo = rooms.find(r => r.name === room);
-  if(roomInfo && students && students > roomInfo.capacity){
+  const overCapacity = roomNames
+    .map(name => rooms.find(r => r.name === name))
+    .filter(info => info && students && students > info.capacity);
+  if(overCapacity.length){
     box.classList.add('show','warn');
-    box.textContent = `Atenção: ${students} alunos excede a capacidade de ${roomInfo.capacity} de ${room}. Você ainda pode confirmar, mas verifique a adequação do espaço.`;
+    box.textContent = `Atenção: ${students} alunos excede a capacidade de ${overCapacity.map(r=>`${r.name} (${r.capacity})`).join(', ')}. Você ainda pode confirmar, mas verifique a adequação do espaço.`;
     return;
   }
 
   box.classList.add('show','ok');
-  box.textContent = `${room} está disponível nesse dia e horário.`;
+  box.textContent = roomNames.length > 1
+    ? `${roomNames.join(', ')} estão disponíveis nesse dia e horário.`
+    : `${roomNames[0]} está disponível nesse dia e horário.`;
 }
 
 async function submitBooking(){
@@ -1398,12 +1708,12 @@ async function submitBooking(){
   const fase = document.getElementById('f-fase').value;
   const turma = document.getElementById('f-turma').value;
   const type = currentType();
-  const room = document.getElementById('f-room').value;
+  const roomNames = Array.from(selectedRooms);
   const students = parseInt(document.getElementById('f-students').value, 10) || null;
   const notes = document.getElementById('f-notes').value.trim();
 
-  if(!professor || !date || !startTime || !endTime || !room){
-    toast('Preencha todos os campos obrigatórios.');
+  if(!professor || !date || !startTime || !endTime || roomNames.length === 0){
+    toast('Preencha todos os campos obrigatórios, incluindo ao menos um ambiente.');
     return;
   }
 
@@ -1412,25 +1722,33 @@ async function submitBooking(){
 
   // Reconfere contra o estado mais recente (mantido em tempo real
   // pelo listener do Firestore) para reduzir o risco de duas pessoas
-  // reservarem o mesmo horário quase ao mesmo tempo.
-  const clash = bookings.find(b => b.room === room && b.date === date && overlaps(startTime, endTime, b.startTime, b.endTime));
+  // reservarem o mesmo horário quase ao mesmo tempo, num dos ambientes.
+  const clash = roomNames
+    .map(room => bookings.find(b => b.room === room && b.date === date && overlaps(startTime, endTime, b.startTime, b.endTime)))
+    .find(Boolean);
   if(clash){
     checkConflict();
-    toast('Esse horário acabou de ser reservado por outra pessoa. Escolha outro.');
+    toast('Esse horário acabou de ser reservado por outra pessoa em um dos ambientes. Escolha outro.');
     return;
   }
 
-  const booking = {
-    id: Date.now(),
+  const baseId = Date.now();
+  const newBookings = roomNames.map((room, i) => ({
+    id: baseId + i,
     professor, date, startTime, endTime, type, room,
     uc: uc || null, fase: fase || null, turma: turma || null,
     students, materials: Array.from(selectedMaterials),
     notes: notes || null,
     createdAt: new Date().toISOString()
-  };
+  }));
 
+  // Grava todos os ambientes de uma vez, de forma atômica: ou todos
+  // os agendamentos são salvos, ou nenhum é (evita ficar com apenas
+  // parte dos ambientes reservados em caso de falha no meio do processo).
   try{
-    await setDoc(doc(bookingsColRef, String(booking.id)), booking);
+    const batch = writeBatch(db);
+    newBookings.forEach(b => batch.set(doc(bookingsColRef, String(b.id)), b));
+    await batch.commit();
   }catch(e){
     console.error(e);
     toast('Erro ao salvar agendamento. Verifique sua conexão.');
@@ -1439,9 +1757,11 @@ async function submitBooking(){
 
   // O aviso por e-mail é "melhor esforço": se falhar, o agendamento
   // continua confirmado normalmente (já está salvo no Firestore).
-  sendBookingEmail(booking);
+  sendBookingEmail(newBookings);
 
-  toast(`Agendamento confirmado: ${ticketCode(booking.id)}`);
+  toast(roomNames.length > 1
+    ? `Agendamento confirmado em ${roomNames.length} ambientes.`
+    : `Agendamento confirmado: ${ticketCode(newBookings[0].id)}`);
 
   document.getElementById('f-prof').value='';
   document.getElementById('f-date').value='';
@@ -1454,6 +1774,8 @@ async function submitBooking(){
   document.getElementById('f-notes').value='';
   selectedMaterials.clear();
   renderMaterialChips();
+  selectedRooms.clear();
+  renderRoomChips();
   checkConflict();
 }
 
@@ -1487,10 +1809,10 @@ function renderTickets(){
   }
 
   list.innerHTML = filtered.map(b => `
-    <div class="ticket ${b.type}">
+    <div class="ticket ${b.type}" style="${roomColorVars(b.room)}">
       <div class="ticket-main">
         <div class="ticket-code">${ticketCode(b.id)}</div>
-        <div class="ticket-room">${escapeHtml(b.room)}</div>
+        <div class="ticket-room">${roomDot(b.room)}${escapeHtml(b.room)}</div>
         <div class="ticket-prof">${escapeHtml(b.professor)}</div>
         ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${escapeHtml([b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="ticket-datetime">${fmtDate(b.date)} · ${b.startTime}–${b.endTime}</div>
@@ -1508,7 +1830,8 @@ function renderTickets(){
   list.querySelectorAll('[data-cancel]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.dataset.cancel;
-      if(!confirm('Cancelar este agendamento?')) return;
+      const ok = await showConfirm('Cancelar este agendamento?', 'Cancelar agendamento');
+      if(!ok) return;
       try{
         await deleteDoc(doc(bookingsColRef, String(id)));
         toast('Agendamento cancelado.');
@@ -1560,12 +1883,20 @@ function renderCalendar(){
     const isSel = c.dateStr === selectedCalDate;
     const maxShow = 3;
     const eventsHtml = dayBookings.slice(0,maxShow).map(b=>
-      `<div class="cal-event ${b.type}" data-id="${b.id}" title="${escapeHtml(b.professor)} · ${escapeHtml(b.room)} · ${b.startTime}–${b.endTime}">${escapeHtml(b.professor)} · ${escapeHtml(b.room)}</div>`
+      `<div class="cal-event" data-id="${b.id}" style="${roomColorVars(b.room)}" title="${escapeHtml(b.professor)} · ${escapeHtml(b.room)} · ${b.startTime}–${b.endTime}">${escapeHtml(b.professor)} · ${escapeHtml(b.room)}</div>`
     ).join('');
     const moreHtml = dayBookings.length > maxShow ? `<div class="cal-event-more">+${dayBookings.length-maxShow} mais</div>` : '';
+
+    const maxDots = 6;
+    const dotsHtml = dayBookings.slice(0,maxDots).map(b=>
+      `<span class="cal-dot" data-id="${b.id}" style="background:hsl(${roomHue(b.room)},62%,48%);" title="${escapeHtml(b.room)} · ${b.startTime}"></span>`
+    ).join('');
+    const dotsMoreHtml = dayBookings.length > maxDots ? `<span class="cal-dot-more">+${dayBookings.length-maxDots}</span>` : '';
+
     return `<div class="cal-day ${isToday?'today':''} ${isSel?'selected':''}" data-date="${c.dateStr}">
       <div class="cal-day-num">${c.day}</div>
-      ${eventsHtml}${moreHtml}
+      <div class="cal-events-desktop">${eventsHtml}${moreHtml}</div>
+      ${dayBookings.length ? `<div class="cal-events-mobile">${dotsHtml}${dotsMoreHtml}</div>` : ''}
     </div>`;
   }).join('');
 
@@ -1576,7 +1907,7 @@ function renderCalendar(){
     });
   });
 
-  grid.querySelectorAll('.cal-event[data-id]').forEach(el=>{
+  grid.querySelectorAll('.cal-event[data-id], .cal-dot[data-id]').forEach(el=>{
     el.addEventListener('click', (e)=>{
       e.stopPropagation();
       openBookingDetail(Number(el.dataset.id));
@@ -1604,10 +1935,10 @@ function renderCalDayDetail(){
   }
 
   wrap.innerHTML = heading + dayBookings.map(b => `
-    <div class="ticket ${b.type}" data-id="${b.id}" style="cursor:pointer;">
+    <div class="ticket ${b.type}" data-id="${b.id}" style="cursor:pointer;${roomColorVars(b.room)}">
       <div class="ticket-main">
         <div class="ticket-code">${ticketCode(b.id)}</div>
-        <div class="ticket-room">${escapeHtml(b.room)}</div>
+        <div class="ticket-room">${roomDot(b.room)}${escapeHtml(b.room)}</div>
         <div class="ticket-prof">${escapeHtml(b.professor)}</div>
         ${(b.uc || b.fase || b.turma) ? `<div class="ticket-class-info">${escapeHtml([b.uc, b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="ticket-datetime">${b.startTime}–${b.endTime}</div>
@@ -1617,12 +1948,29 @@ function renderCalDayDetail(){
       <div class="ticket-side">
         <span class="badge ${b.type}">${b.type==='lab'?'Laboratório':'Sala de aula'}</span>
         ${b.students ? `<span class="students-count">${b.students} alunos</span>` : ''}
+        ${isAdmin ? `<button class="btn-ghost" data-cancel-day="${b.id}" onclick="event.stopPropagation();">Cancelar</button>` : ''}
       </div>
     </div>
   `).join('');
 
   wrap.querySelectorAll('.ticket[data-id]').forEach(el=>{
     el.addEventListener('click', ()=> openBookingDetail(Number(el.dataset.id)));
+  });
+
+  wrap.querySelectorAll('[data-cancel-day]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const id = btn.dataset.cancelDay;
+      const ok = await showConfirm('Cancelar este agendamento?', 'Cancelar agendamento');
+      if(!ok) return;
+      try{
+        await deleteDoc(doc(bookingsColRef, String(id)));
+        toast('Agendamento cancelado.');
+      }catch(e){
+        console.error(e);
+        toast('Erro ao cancelar. Verifique sua conexão.');
+      }
+    });
   });
 }
 
@@ -1632,42 +1980,92 @@ function roomTypeOf(roomName){
   return 'lab';
 }
 
+const WEEKDAY_NAMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
 function computeStatsForMonths(year, months){
   const filtered = bookings.filter(b=>{
     const [y,m] = b.date.split('-').map(Number);
     return y === year && months.includes(m);
   });
+
   const roomCounts = {};
-  filtered.forEach(b=>{ roomCounts[b.room] = (roomCounts[b.room]||0) + 1; });
+  const typeCounts = {};
+  const professorCounts = {};
+  const ucCounts = {};
+  const faseCounts = {};
+  const turmaCounts = {};
+  const weekdayCounts = {};
+  const hourCounts = {};
   const materialCounts = {};
+  let totalStudents = 0;
+  let bookingsWithStudents = 0;
+
   filtered.forEach(b=>{
+    roomCounts[b.room] = (roomCounts[b.room]||0) + 1;
+
+    const typeLabel = b.type === 'lab' ? 'Laboratório' : 'Sala de aula';
+    typeCounts[typeLabel] = (typeCounts[typeLabel]||0) + 1;
+
+    if(b.professor) professorCounts[b.professor] = (professorCounts[b.professor]||0) + 1;
+    if(b.uc) ucCounts[b.uc] = (ucCounts[b.uc]||0) + 1;
+    if(b.fase) faseCounts[`${b.fase}ª fase`] = (faseCounts[`${b.fase}ª fase`]||0) + 1;
+    if(b.turma) turmaCounts[`Turma ${b.turma}`] = (turmaCounts[`Turma ${b.turma}`]||0) + 1;
+
+    const [y,m,d] = b.date.split('-').map(Number);
+    const weekday = new Date(y, m-1, d).getDay();
+    weekdayCounts[WEEKDAY_NAMES[weekday]] = (weekdayCounts[WEEKDAY_NAMES[weekday]]||0) + 1;
+
+    if(b.startTime){
+      const hour = b.startTime.split(':')[0];
+      const hourLabel = `${hour}h`;
+      hourCounts[hourLabel] = (hourCounts[hourLabel]||0) + 1;
+    }
+
+    if(b.students){
+      totalStudents += b.students;
+      bookingsWithStudents++;
+    }
+
     (b.materials||[]).forEach(m=>{ materialCounts[m] = (materialCounts[m]||0) + 1; });
   });
-  return {roomCounts, materialCounts};
+
+  // Ordena dias da semana e horários em ordem natural, não por contagem
+  const weekdayOrdered = {};
+  WEEKDAY_NAMES.forEach(d=>{ if(weekdayCounts[d]) weekdayOrdered[d] = weekdayCounts[d]; });
+  const hourOrdered = {};
+  Object.keys(hourCounts).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(h=>{ hourOrdered[h] = hourCounts[h]; });
+
+  return {
+    roomCounts, typeCounts, professorCounts, ucCounts, faseCounts, turmaCounts,
+    weekdayCounts: weekdayOrdered, hourCounts: hourOrdered, materialCounts,
+    totalBookings: filtered.length,
+    totalStudents,
+    avgStudents: bookingsWithStudents ? Math.round(totalStudents / bookingsWithStudents) : 0
+  };
 }
 
-function renderBarChart(containerId, counts, fillClassFn){
+function renderBarChart(containerId, counts, fillClassFn, styleFn, preserveOrder){
   const el = document.getElementById(containerId);
-  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const entries = preserveOrder ? Object.entries(counts) : Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   if(entries.length === 0){
     el.innerHTML = `<div class="empty-state" style="padding:20px 6px;"><div class="icon">📊</div>Sem dados nesse período.</div>`;
     return;
   }
-  const max = entries[0][1];
+  const max = Math.max(...entries.map(e=>e[1]));
   el.innerHTML = entries.map(([name,count])=>{
     const pct = Math.max(6, Math.round((count/max)*100));
     const cls = fillClassFn ? fillClassFn(name) : '';
+    const style = styleFn ? styleFn(name) : '';
     return `<div class="bar-row">
       <div class="bar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%;${style}"></div></div>
       <div class="bar-count">${count}</div>
     </div>`;
   }).join('');
 }
 
-function renderStats(){
+function getStatsPeriodRange(){
   let year, months, label;
-
   if(statsPeriod === 'sem1'){
     year = statsYear; months = [1,2,3,4,5,6,7];
     label = `Com base nos agendamentos de janeiro a julho de ${statsYear} (1º semestre)`;
@@ -1681,12 +2079,99 @@ function renderStats(){
     year = calYear; months = [calMonth+1];
     label = `Com base nos agendamentos de ${MONTH_NAMES[calMonth]} de ${calYear}`;
   }
+  return {year, months, label};
+}
+
+function renderStats(){
+  if(!isAdmin) return;
+  const {year, months, label} = getStatsPeriodRange();
 
   document.getElementById('statsPeriodLabel').textContent = label;
 
-  const {roomCounts, materialCounts} = computeStatsForMonths(year, months);
-  renderBarChart('chartRooms', roomCounts, (name)=> roomTypeOf(name));
-  renderBarChart('chartMaterials', materialCounts, ()=> 'materials');
+  const stats = computeStatsForMonths(year, months);
+
+  document.getElementById('statsKpis').innerHTML = `
+    <div class="kpi-box"><div class="kpi-value">${stats.totalBookings}</div><div class="kpi-label">Agendamentos</div></div>
+    <div class="kpi-box"><div class="kpi-value">${stats.totalStudents}</div><div class="kpi-label">Alunos atendidos</div></div>
+    <div class="kpi-box"><div class="kpi-value">${stats.avgStudents || '—'}</div><div class="kpi-label">Média de alunos/turma</div></div>
+  `;
+
+  renderBarChart('chartRooms', stats.roomCounts, null, (name)=>`background:hsl(${roomHue(name)},62%,48%);`);
+  renderBarChart('chartType', stats.typeCounts, (name)=> name==='Laboratório' ? 'lab' : 'classroom');
+  renderBarChart('chartProfessors', stats.professorCounts, ()=> 'materials');
+  renderBarChart('chartUC', stats.ucCounts, ()=> 'materials');
+  renderBarChart('chartFase', stats.faseCounts, null, ()=> `background:var(--indigo);`);
+  renderBarChart('chartTurma', stats.turmaCounts, null, ()=> `background:var(--indigo);`);
+  renderBarChart('chartWeekday', stats.weekdayCounts, null, ()=> `background:var(--teal);`, true);
+  renderBarChart('chartHour', stats.hourCounts, null, ()=> `background:var(--teal);`, true);
+  renderBarChart('chartMaterials', stats.materialCounts, ()=> 'materials');
+}
+
+function csvEscape(val){
+  if(val === null || val === undefined) return '';
+  const s = String(val);
+  if(/[";\n]/.test(s)){
+    return '"' + s.replace(/"/g,'""') + '"';
+  }
+  return s;
+}
+
+// Exporta os agendamentos do período de estatísticas selecionado em CSV
+// (separador ; para abrir corretamente no Excel em português).
+function exportStatsCSV(){
+  const {year, months, label} = getStatsPeriodRange();
+  const filtered = bookings
+    .filter(b=>{
+      const [y,m] = b.date.split('-').map(Number);
+      return y === year && months.includes(m);
+    })
+    .sort((a,b)=> a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+
+  if(filtered.length === 0){
+    toast('Não há agendamentos nesse período para exportar.');
+    return;
+  }
+
+  const headers = ['Data','Dia da semana','Horário início','Horário fim','Tipo','Ambiente','Professor(a)','Unidade Curricular','Fase','Turma','Nº de alunos','Materiais','Observações complementares'];
+
+  const rows = filtered.map(b=>{
+    const [y,m,d] = b.date.split('-').map(Number);
+    const weekday = WEEKDAY_NAMES[new Date(y,m-1,d).getDay()];
+    return [
+      fmtDate(b.date),
+      weekday,
+      b.startTime,
+      b.endTime,
+      b.type === 'lab' ? 'Laboratório' : 'Sala de aula',
+      b.room,
+      b.professor,
+      b.uc || '',
+      b.fase ? `${b.fase}ª fase` : '',
+      b.turma ? `Turma ${b.turma}` : '',
+      b.students || '',
+      (b.materials||[]).join(', '),
+      b.notes || ''
+    ];
+  });
+
+  const csvLines = [headers, ...rows].map(row => row.map(csvEscape).join(';'));
+  const csvContent = '\uFEFF' + csvLines.join('\r\n');
+
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const slug = label
+    .replace(/^Com base nos agendamentos de /,'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\w]+/g,'_').toLowerCase();
+  a.href = url;
+  a.download = `agendamentos_${slug}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  toast(`CSV exportado com ${filtered.length} agendamento(s).`);
 }
 
 function openBookingDetail(id){
@@ -1695,7 +2180,7 @@ function openBookingDetail(id){
   const content = document.getElementById('bookingModalContent');
   content.innerHTML = `
     <span class="eyebrow">${b.type==='lab'?'Laboratório':'Sala de aula'} · ${ticketCode(b.id)}</span>
-    <h2>${escapeHtml(b.room)}</h2>
+    <h2>${roomDot(b.room)}${escapeHtml(b.room)}</h2>
     <p><strong>Professor(a):</strong> ${escapeHtml(b.professor)}</p>
     ${b.uc ? `<p><strong>Unidade Curricular:</strong> ${escapeHtml(b.uc)}</p>` : ''}
     ${(b.fase || b.turma) ? `<p><strong>Fase/Turma:</strong> ${escapeHtml([b.fase?`${b.fase}ª fase`:null, b.turma?`Turma ${b.turma}`:null].filter(Boolean).join(' · '))}</p>` : ''}
@@ -1706,10 +2191,26 @@ function openBookingDetail(id){
     ${b.notes ? `<p style="margin-bottom:18px;"><strong>Observações:</strong> ${escapeHtml(b.notes)}</p>` : ''}
     <div class="modal-actions">
       <button class="btn-ghost" id="bookingModalClose" style="flex:1;">Fechar</button>
+      ${isAdmin ? `<button class="btn-primary" id="bookingModalCancel" style="flex:1;background:var(--rust);border-color:var(--rust);">Cancelar agendamento</button>` : ''}
     </div>
   `;
   document.getElementById('bookingModal').classList.add('show');
   document.getElementById('bookingModalClose').addEventListener('click', closeBookingDetail);
+  const cancelBtn = document.getElementById('bookingModalCancel');
+  if(cancelBtn){
+    cancelBtn.addEventListener('click', async ()=>{
+      const ok = await showConfirm('Essa ação não pode ser desfeita.', 'Cancelar este agendamento?');
+      if(!ok) return;
+      try{
+        await deleteDoc(doc(bookingsColRef, String(b.id)));
+        closeBookingDetail();
+        toast('Agendamento cancelado.');
+      }catch(e){
+        console.error(e);
+        toast('Erro ao cancelar. Verifique sua conexão.');
+      }
+    });
+  }
 }
 
 function closeBookingDetail(){
@@ -1718,7 +2219,9 @@ function closeBookingDetail(){
 
 function populateFilterRoomOptions(){
   const sel = document.getElementById('filt-room');
-  const all = [...config.labs, ...config.classrooms].map(r=>r.name);
+  const configNames = [...config.labs, ...config.classrooms].map(r=>r.name);
+  const bookingNames = bookings.map(b=>b.room);
+  const all = Array.from(new Set([...configNames, ...bookingNames])).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const current = sel.value;
   sel.innerHTML = `<option value="">Todos os ambientes</option>` + all.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   sel.value = current;
@@ -1874,15 +2377,28 @@ async function init(){
   });
 
   document.querySelectorAll('input[name="tipo"]').forEach(r=>{
-    r.addEventListener('change', populateRoomSelect);
+    r.addEventListener('change', ()=>{
+      selectedRooms.clear();
+      populateRoomSelect();
+    });
   });
 
-  ['f-date','f-start','f-end','f-room','f-students'].forEach(id=>{
+  document.getElementById('f-room-select').addEventListener('change', ()=>{
+    if(document.getElementById('f-room-select').value) addSelectedRoom();
+  });
+
+  document.getElementById('btnAddClassroom').addEventListener('click', addClassroomRoom);
+  document.getElementById('f-classroom-number').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); addClassroomRoom(); }
+  });
+
+  ['f-date','f-start','f-end','f-students'].forEach(id=>{
     document.getElementById(id).addEventListener('input', checkConflict);
     document.getElementById(id).addEventListener('change', checkConflict);
   });
 
   document.getElementById('btnSubmit').addEventListener('click', submitBooking);
+  document.getElementById('btnExportStats').addEventListener('click', exportStatsCSV);
 
   document.getElementById('filt-date').addEventListener('input', renderTickets);
   document.getElementById('filt-room').addEventListener('change', renderTickets);
@@ -1952,6 +2468,10 @@ async function init(){
 
   document.getElementById('bookingModal').addEventListener('click', (e)=>{
     if(e.target.id === 'bookingModal') closeBookingDetail();
+  });
+
+  document.getElementById('confirmModal').addEventListener('click', (e)=>{
+    if(e.target.id === 'confirmModal') document.getElementById('confirmModalNo').click();
   });
 
   document.getElementById('logout-painel').addEventListener('click', logoutAdmin);
